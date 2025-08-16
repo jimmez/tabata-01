@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -36,14 +35,14 @@
 
     /* Timer screen */
     .timer-card{position:relative;background:var(--card);border:1px solid var(--border);border-radius:16px;padding:24px;overflow:hidden}
-    .phase{font-weight:800;letter-spacing:.08em;color:#d0d4de;text-transform:uppercase;text-align:center}
+    .phase{font-weight:800;letter-spacing:.08em;color:#fff;text-transform:uppercase;text-align:center}
     .clock{font-size:96px;font-weight:900;line-height:1;margin:6px 0 6px;text-align:center}
     .rep{font-size:120px;font-weight:900;line-height:1;margin:6px 0 8px;text-align:center;opacity:.2}
-    .sub{color:var(--muted);text-align:center}
+    .sub{color:#fff;text-align:center}
 
     .controls{display:flex;gap:10px;flex-wrap:wrap;justify-content:center;margin-top:10px}
 
-    .pill{background:#1b1d22;border:1px solid var(--border);padding:8px 12px;border-radius:999px;color:#c0c6d4;cursor:pointer}
+    .pill{background:#1b1d22;border:1px solid var(--border);padding:8px 12px;border-radius:999px;color:#fff;cursor:pointer}
     .pill b{color:#fff}
 
     .row{display:flex;gap:10px;align-items:center;justify-content:center;margin-top:14px}
@@ -290,6 +289,20 @@
       const remain = Math.max(0, total - Math.floor(state.elapsed));
       const p = secsToParts(remain);
       clockEl.textContent = `${pad(p.m)}:${pad(p.s)}`;
+      // Full-screen bar shrinks downward over time
+      const frac = total>0 ? clamp(state.elapsed/total,0,1) : 1;
+      progressFull.style.height = ((1-frac)*100).toFixed(3)+'vh';
+      // Set bar color by phase: red for work, green for rest
+      if(state.phase==='work'){
+        progressFull.style.background = 'linear-gradient(to bottom, rgba(239,68,68,.95), rgba(239,68,68,.65))';
+        progressFull.style.boxShadow = '0 10px 30px rgba(239,68,68,.45)';
+      } else {
+        progressFull.style.background = 'linear-gradient(to bottom, rgba(34,197,94,.95), rgba(34,197,94,.65))';
+        progressFull.style.boxShadow = '0 10px 30px rgba(34,197,94,.45)';
+      }
+      repEl.textContent = state.rep;
+      phaseEl.textContent = state.phase==='work'?'Work':'Rest';
+    }:${pad(p.s)}`;
       // Full-screen bar shrinks downward over time
       const frac = total>0 ? clamp(state.elapsed/total,0,1) : 1;
       progressFull.style.height = ((1-frac)*100).toFixed(3)+'vh';
