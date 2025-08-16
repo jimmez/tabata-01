@@ -1,1 +1,420 @@
 
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Tabata Timer</title>
+  <style>
+    :root{
+      --bg:#000;--fg:#f5f7fb;--muted:#9aa3b2;--accent:#6ee7b7;--danger:#ef4444;--card:#121317;--border:#23252b;
+    }
+    *{box-sizing:border-box}
+    html,body{height:100%}
+    body{margin:0;background:var(--bg);color:var(--fg);font-family:Inter,ui-sans-serif,system-ui,Segoe UI,Roboto,Helvetica,Arial;-webkit-tap-highlight-color:transparent}
+
+    /* Full-screen red progress overlay (shrinks downward over time) */
+    .progress-full{position:fixed;inset:0 0 auto 0;height:100vh;background:linear-gradient(to bottom, rgba(239,68,68,.95), rgba(239,68,68,.65));box-shadow:0 10px 30px rgba(239,68,68,.45);pointer-events:none;z-index:0}
+
+    .app{position:relative;z-index:1;max-width:780px;margin:0 auto;height:100%;display:flex;flex-direction:column;gap:12px;padding:16px}
+
+    /* Top bar */
+    .topbar{display:flex;align-items:center;gap:12px;justify-content:space-between}
+    .top-left,.top-right{display:flex;align-items:center;gap:10px}
+    .chip{display:inline-flex;align-items:center;gap:8px;padding:8px 12px;background:var(--card);border:1px solid var(--border);border-radius:999px;font-size:14px}
+    .switch{position:relative;width:48px;height:28px;background:#333;border-radius:999px;border:1px solid var(--border);cursor:pointer}
+    .switch input{display:none}
+    .knob{position:absolute;top:2px;left:2px;width:24px;height:24px;border-radius:50%;background:#888;transition:all .18s ease}
+    .switch input:checked + .knob{left:22px;background:var(--accent)}
+    .btn{appearance:none;border:none;background:var(--card);border:1px solid var(--border);color:var(--fg);padding:10px 14px;border-radius:12px;font-weight:600;cursor:pointer}
+    .btn:active{transform:translateY(1px)}
+    input[type="range"]{accent-color:var(--accent)}
+
+    /* Screens */
+    .screen{display:none}
+    .screen.active{display:block}
+
+    /* Timer screen */
+    .timer-card{position:relative;background:var(--card);border:1px solid var(--border);border-radius:16px;padding:24px;overflow:hidden}
+    .phase{font-weight:800;letter-spacing:.08em;color:#d0d4de;text-transform:uppercase;text-align:center}
+    .clock{font-size:96px;font-weight:900;line-height:1;margin:6px 0 6px;text-align:center}
+    .rep{font-size:120px;font-weight:900;line-height:1;margin:6px 0 8px;text-align:center;opacity:.2}
+    .sub{color:var(--muted);text-align:center}
+
+    .controls{display:flex;gap:10px;flex-wrap:wrap;justify-content:center;margin-top:10px}
+
+    .pill{background:#1b1d22;border:1px solid var(--border);padding:8px 12px;border-radius:999px;color:#c0c6d4;cursor:pointer}
+    .pill b{color:#fff}
+
+    .row{display:flex;gap:10px;align-items:center;justify-content:center;margin-top:14px}
+    .big-btn{font-size:18px;padding:14px 18px;border-radius:14px}
+
+    /* Settings screen */
+    .settings{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:16px}
+    h2{margin:4px 0 12px;font-size:18px;color:#c0c6d4;text-transform:uppercase;letter-spacing:.08em}
+    .block{background:#131418;border:1px solid var(--border);border-radius:14px;padding:12px;margin-bottom:12px}
+
+    .digit-row{display:flex;align-items:center;justify-content:center;gap:10px}
+    .digit-box{display:flex;flex-direction:column;align-items:center;gap:6px}
+    .digit{width:58px;height:72px;border-radius:12px;border:1px solid var(--border);background:#0f1013;display:grid;place-items:center;font-size:32px;font-weight:800;cursor:pointer;user-select:none}
+    .digit:focus{outline:2px solid var(--accent)}
+    .dlabel{font-size:12px;color:var(--muted)}
+    .ud{display:flex;gap:6px}
+    .ud button{width:58px;padding:6px 0;border-radius:10px;background:#1d2026;border:1px solid var(--border);color:var(--fg);font-weight:800}
+
+    .mmsep{font-size:42px;color:#6b7280;margin:0 6px}
+
+    .footnote{color:var(--muted);font-size:12px;text-align:center;margin-top:6px}
+
+    /* Glow helper to highlight the last-opened section */
+    .glow{box-shadow:0 0 0 2px var(--accent) inset,0 0 30px rgba(110,231,183,.25)}
+
+    @media (max-width:460px){.clock{font-size:72px}.rep{font-size:90px}.digit{width:52px;height:64px}.ud button{width:52px}}
+  </style>
+</head>
+<body>
+  <!-- FULL-SCREEN PROGRESS OVERLAY -->
+  <div class="progress-full" id="progressFull"></div>
+
+  <div class="app" id="app">
+    <div class="topbar">
+      <div class="top-left">
+        <label class="chip" title="Toggle all sounds">
+          <span>Sound</span>
+          <div class="switch">
+            <input type="checkbox" id="soundToggle" checked />
+            <div class="knob"></div>
+          </div>
+        </label>
+        <label class="chip" title="Volume">
+          <span>Vol</span>
+          <input id="volume" type="range" min="0" max="100" value="70" />
+        </label>
+      </div>
+      <div class="top-right">
+        <button class="btn" id="openSettings" aria-label="Open settings">⚙️ Settings</button>
+      </div>
+    </div>
+
+    <!-- TIMER SCREEN -->
+    <section id="timerScreen" class="screen active">
+      <div class="timer-card" id="timerCard">
+        <div class="phase" id="phase">Work</div>
+        <div class="rep" id="rep">1</div>
+        <div class="clock" id="clock">00:20</div>
+        <div class="sub">Tap anywhere to pause / resume</div>
+        <div class="controls">
+          <span class="pill" id="workLabel" title="Double-tap to edit Work time">Work: <b><span id="workMM">00</span>:<span id="workSS">20</span></b></span>
+          <span class="pill" id="restLabel" title="Double-tap to edit Rest time">Rest: <b><span id="restMM">00</span>:<span id="restSS">10</span></b></span>
+        </div>
+        <div class="row">
+          <button id="startBtn" class="btn big-btn">▶️ Start</button>
+          <button id="resetBtn" class="btn big-btn">⏹ Reset</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- SETTINGS SCREEN -->
+    <section id="settingsScreen" class="screen">
+      <div class="settings">
+        <h2>Work Time</h2>
+        <div class="block" id="blockWork">
+          <div class="digit-row" data-kind="work">
+            <!-- Minutes tens, minutes ones, seconds tens, seconds ones -->
+            <div class="digit-box" data-role="mt">
+              <div class="ud"><button data-act="inc">＋</button></div>
+              <div class="digit" tabindex="0">0</div>
+              <div class="ud"><button data-act="dec">－</button></div>
+              <div class="dlabel">Min (tens)</div>
+            </div>
+            <div class="digit-box" data-role="mo">
+              <div class="ud"><button data-act="inc">＋</button></div>
+              <div class="digit" tabindex="0">0</div>
+              <div class="ud"><button data-act="dec">－</button></div>
+              <div class="dlabel">Min (ones)</div>
+            </div>
+            <div class="mmsep">:</div>
+            <div class="digit-box" data-role="st">
+              <div class="ud"><button data-act="inc">＋</button></div>
+              <div class="digit" tabindex="0">2</div>
+              <div class="ud"><button data-act="dec">－</button></div>
+              <div class="dlabel">Sec (tens)</div>
+            </div>
+            <div class="digit-box" data-role="so">
+              <div class="ud"><button data-act="inc">＋</button></div>
+              <div class="digit" tabindex="0">0</div>
+              <div class="ud"><button data-act="dec">－</button></div>
+              <div class="dlabel">Sec (ones)</div>
+            </div>
+          </div>
+        </div>
+
+        <h2>Rest Time</h2>
+        <div class="block" id="blockRest">
+          <div class="digit-row" data-kind="rest">
+            <div class="digit-box" data-role="mt">
+              <div class="ud"><button data-act="inc">＋</button></div>
+              <div class="digit" tabindex="0">0</div>
+              <div class="ud"><button data-act="dec">－</button></div>
+              <div class="dlabel">Min (tens)</div>
+            </div>
+            <div class="digit-box" data-role="mo">
+              <div class="ud"><button data-act="inc">＋</button></div>
+              <div class="digit" tabindex="0">0</div>
+              <div class="ud"><button data-act="dec">－</button></div>
+              <div class="dlabel">Min (ones)</div>
+            </div>
+            <div class="mmsep">:</div>
+            <div class="digit-box" data-role="st">
+              <div class="ud"><button data-act="inc">＋</button></div>
+              <div class="digit" tabindex="0">1</div>
+              <div class="ud"><button data-act="dec">－</button></div>
+              <div class="dlabel">Sec (tens)</div>
+            </div>
+            <div class="digit-box" data-role="so">
+              <div class="ud"><button data-act="inc">＋</button></div>
+              <div class="digit" tabindex="0">0</div>
+              <div class="ud"><button data-act="dec">－</button></div>
+              <div class="dlabel">Sec (ones)</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="row">
+          <button class="btn" id="backToTimer">↩️ Back to Timer</button>
+          <button class="btn" id="saveSettings">💾 Save</button>
+        </div>
+        <div class="footnote">Tip: tap a digit to type a number 0–9. Plus/Minus adjusts each digit.</div>
+      </div>
+    </section>
+  </div>
+
+  <script>
+    // Utilities
+    const el = (id)=>document.getElementById(id);
+    const qs = (sel,root=document)=>root.querySelector(sel);
+    const qsa = (sel,root=document)=>Array.from(root.querySelectorAll(sel));
+    const clamp=(v,min,max)=>Math.min(max,Math.max(min,v));
+    const pad=(n)=>String(n).padStart(2,'0');
+
+    // State
+    const state = {
+      work: 20, // seconds
+      rest: 10, // seconds
+      phase: 'work',
+      running: false,
+      startTs: 0,
+      elapsed: 0,
+      rep: 1,
+      muted: false,
+      volume: 0.7,
+    };
+
+    // Persistence
+    (function load(){
+      try{
+        const saved = JSON.parse(localStorage.getItem('tabata_v2')||'{}');
+        if(Number.isFinite(saved.work)) state.work=saved.work;
+        if(Number.isFinite(saved.rest)) state.rest=saved.rest;
+        if(typeof saved.muted==='boolean') state.muted=saved.muted;
+        if(Number.isFinite(saved.volume)) state.volume=saved.volume;
+      }catch{}
+    })();
+    function save(){
+      localStorage.setItem('tabata_v2', JSON.stringify({work:state.work,rest:state.rest,muted:state.muted,volume:state.volume}));
+    }
+
+    // Elements
+    const timerScreen = el('timerScreen');
+    const settingsScreen = el('settingsScreen');
+    const phaseEl = el('phase');
+    const clockEl = el('clock');
+    const repEl = el('rep');
+    const progressFull = el('progressFull');
+    const workMM=el('workMM'), workSS=el('workSS'), restMM=el('restMM'), restSS=el('restSS');
+    const soundToggle = el('soundToggle');
+    const volumeInput = el('volume');
+
+    // Setup topbar
+    soundToggle.checked = !state.muted;
+    volumeInput.value = Math.round(state.volume*100);
+    soundToggle.addEventListener('change',()=>{ state.muted = !soundToggle.checked; save(); });
+    volumeInput.addEventListener('input',()=>{ state.volume = clamp(+volumeInput.value/100, 0, 1); save(); });
+
+    // Settings open/close
+    el('openSettings').addEventListener('click',()=> openSettings());
+    el('backToTimer').addEventListener('click',()=> showScreen('timer'));
+    el('saveSettings').addEventListener('click',()=>{
+      const w = readDigits('work');
+      const r = readDigits('rest');
+      state.work = w; state.rest = r; save();
+      updateLabels();
+      showScreen('timer');
+      updateClockDisplay();
+    });
+
+    function showScreen(which){
+      if(which==='settings'){
+        settingsScreen.classList.add('active');
+        timerScreen.classList.remove('active');
+      } else {
+        timerScreen.classList.add('active');
+        settingsScreen.classList.remove('active');
+      }
+    }
+    function openSettings(focus){
+      pause();
+      showScreen('settings');
+      populateDigits('work', state.work);
+      populateDigits('rest', state.rest);
+      if(focus==='work') highlightBlock(el('blockWork'));
+      if(focus==='rest') highlightBlock(el('blockRest'));
+    }
+    function highlightBlock(block){
+      block.classList.add('glow'); block.scrollIntoView({behavior:'smooth',block:'center'});
+      setTimeout(()=>block.classList.remove('glow'),1200);
+    }
+
+    // Time helpers
+    function secsToParts(s){ s=clamp(Math.round(s),0,3599); const m=Math.floor(s/60), r=s%60; return {m,s:r}; }
+    function partsToSecs(mt,mo,st,so){ let m=mt*10+mo; let s=st*10+so; m=clamp(m,0,59); s=clamp(s,0,59); return m*60+s; }
+
+    function updateLabels(){
+      const wp=secsToParts(state.work), rp=secsToParts(state.rest);
+      workMM.textContent=pad(wp.m); workSS.textContent=pad(wp.s);
+      restMM.textContent=pad(rp.m); restSS.textContent=pad(rp.s);
+    }
+
+    function updateClockDisplay(){
+      const total = state.phase==='work'?state.work:state.rest;
+      const remain = Math.max(0, total - Math.floor(state.elapsed));
+      const p = secsToParts(remain);
+      clockEl.textContent = `${pad(p.m)}:${pad(p.s)}`;
+      // Full-screen bar shrinks downward over time
+      const frac = total>0 ? clamp(state.elapsed/total,0,1) : 1;
+      progressFull.style.height = ((1-frac)*100).toFixed(3)+'vh';
+      repEl.textContent = state.rep;
+      phaseEl.textContent = state.phase==='work'?'Work':'Rest';
+    }
+
+    updateLabels();
+    updateClockDisplay();
+
+    // Digit editor
+    function populateDigits(kind, secs){
+      const row = qs(`.digit-row[data-kind="${kind}"]`);
+      const {m,s} = secsToParts(secs);
+      const mt=Math.floor(m/10), mo=m%10, st=Math.floor(s/10), so=s%10;
+      const map = {mt,mo,st,so};
+      qsa('.digit-box', row).forEach(box=>{ qs('.digit', box).textContent = map[box.dataset.role]; });
+    }
+    function readDigits(kind){
+      const row = qs(`.digit-row[data-kind="${kind}"]`);
+      const mt=+qs('[data-role="mt"] .digit',row).textContent;
+      const mo=+qs('[data-role="mo"] .digit',row).textContent;
+      const st=+qs('[data-role="st"] .digit',row).textContent;
+      const so=+qs('[data-role="so"] .digit',row).textContent;
+      return partsToSecs(mt,mo,st,so);
+    }
+
+    qsa('.digit-row').forEach(row=>{
+      row.addEventListener('click', (e)=>{
+        const box = e.target.closest('.digit-box'); if(!box) return;
+        const digitEl = qs('.digit', box);
+        // Tap to type a single digit
+        if(e.target===digitEl){
+          const v = prompt('Enter a digit (0–9):', digitEl.textContent);
+          if(v==null) return; const d = Number(v.trim());
+          if(Number.isInteger(d) && d>=0 && d<=9){
+            const role = box.dataset.role;
+            digitEl.textContent = String(clamp(d, (role==='mt'||role==='st')?0:0, (role==='mt'||role==='st')?5:9));
+          }
+        }
+        // Plus / minus per digit
+        const actBtn = e.target.closest('button[data-act]');
+        if(actBtn){
+          const role = box.dataset.role; let cur = +digitEl.textContent; const inc=actBtn.dataset.act==='inc';
+          const max=(role==='mt'||role==='st')?5:9, min=0; cur = inc?cur+1:cur-1; if(cur>max)cur=min; if(cur<min)cur=max; digitEl.textContent=String(cur);
+        }
+      });
+    });
+
+    // Double-tap to open settings from timer pills
+    function bindDoubleTap(elem, fn){
+      let last=0; elem.addEventListener('click', (e)=>{ const now=Date.now(); if(now-last<300){ e.stopPropagation(); fn(e);} last=now; });
+      elem.addEventListener('dblclick', (e)=>{ e.preventDefault(); e.stopPropagation(); fn(e); });
+    }
+    bindDoubleTap(el('workLabel'), ()=> openSettings('work'));
+    bindDoubleTap(el('restLabel'), ()=> openSettings('rest'));
+
+    // Timer engine
+    let rafId=null;
+    function start(){
+      if(state.running) return;
+      state.running=true; state.startTs = performance.now() - state.elapsed*1000;
+      runPhaseTone();
+      loop();
+    }
+    function pause(){ state.running=false; if(rafId) cancelAnimationFrame(rafId); rafId=null; }
+    function reset(){ pause(); state.elapsed=0; state.phase='work'; state.rep=1; updateClockDisplay(); }
+
+    function switchPhase(){
+      if(state.phase==='work'){
+        state.phase='rest';
+      } else {
+        state.phase='work';
+        state.rep += 1; // increment on entering a new Work phase
+      }
+      state.elapsed=0; state.startTs = performance.now();
+      runPhaseTone();
+      updateClockDisplay();
+    }
+
+    function loop(){
+      if(!state.running) return;
+      const total = state.phase==='work'?state.work:state.rest;
+      const now = performance.now();
+      state.elapsed = Math.max(0, (now - state.startTs)/1000);
+      if(state.elapsed >= total){
+        switchPhase();
+      }
+      updateClockDisplay();
+      rafId = requestAnimationFrame(loop);
+    }
+
+    el('startBtn').addEventListener('click', (e)=>{ ensureAudio(); start(); e.stopPropagation(); });
+    el('resetBtn').addEventListener('click', (e)=>{ reset(); e.stopPropagation(); });
+
+    // Pause/Resume by tapping anywhere on timer screen
+    timerScreen.addEventListener('click', (e)=>{
+      // Ignore clicks on obvious controls
+      if(e.target.closest('button, input, .pill')) return;
+      if(state.running){ pause(); } else { ensureAudio(); start(); }
+    });
+
+    // AUDIO
+    let audioCtx=null;
+    function ensureAudio(){
+      if(!audioCtx){ audioCtx = new (window.AudioContext||window.webkitAudioContext)(); }
+      if(audioCtx.state==='suspended'){ audioCtx.resume(); }
+    }
+
+    function beep(freq=440, dur=0.3, t0){
+      if(state.muted||!audioCtx) return 0;
+      const ctx=audioCtx; const now = t0??ctx.currentTime; const osc=ctx.createOscillator(); const gain=ctx.createGain();
+      osc.type='sine'; osc.frequency.value=freq; gain.gain.setValueAtTime(0, now);
+      gain.gain.linearRampToValueAtTime(state.volume*0.6, now+0.01);
+      gain.gain.exponentialRampToValueAtTime(0.0001, now+dur);
+      osc.connect(gain).connect(ctx.destination); osc.start(now); osc.stop(now+dur+0.02);
+      return dur;
+    }
+    function workTone(){ ensureAudio(); beep(440,1.0); }
+    function restTone(){ ensureAudio(); const start=audioCtx.currentTime; const d1=beep(784,0.28,start); const d2=beep(523,0.34,start+d1+0.06); return d1+d2+0.06; }
+    function runPhaseTone(){ if(state.muted) return; if(state.phase==='work') workTone(); else restTone(); }
+
+    // Initialize UI
+    updateClockDisplay();
+
+  </script>
+</body>
+</html>
