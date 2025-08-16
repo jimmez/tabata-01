@@ -8,6 +8,7 @@
     :root{
       --bg:#000; --fg:#fff;
       --accent:#6ee7b7;
+      --active:#60a5fa;           /* light blue highlight when active */
       --border:#23252b;
 
       /* PHASE COLORS: GREEN = WORK, RED = REST */
@@ -24,18 +25,21 @@
       -webkit-tap-highlight-color:transparent;
     }
 
-    /* FULLSCREEN BARGRAPH (background; starts full at top, shrinks downward) */
+    /* FULLSCREEN BARGRAPH (background; starts small, grows to full-screen by end) */
     .progress-full{
-      position:fixed; left:0; right:0; top:0; height:100vh;
-      background:linear-gradient(to bottom, var(--work1), var(--work2)); /* default WORK */
-      box-shadow:0 10px 30px rgba(34,197,94,.45);
+      position:fixed; left:0; right:0; bottom:0;  /* grow upward visually */
+      height:6vh;                                  /* small at start */
+      background:linear-gradient(to top, var(--work1), var(--work2)); /* default WORK look */
+      box-shadow:0 -10px 30px rgba(34,197,94,.35);
       pointer-events:none; z-index:0;
-      will-change:height, background;
+      will-change:height, background, box-shadow;
       transition:background .12s ease, box-shadow .12s ease;
     }
 
-    .app{position:relative; z-index:1; max-width:820px; margin:0 auto; min-height:100%;
-      display:flex; flex-direction:column; gap:12px; padding:16px 16px 72px;}
+    .app{
+      position:relative; z-index:1; max-width:820px; margin:0 auto; min-height:100%;
+      display:flex; flex-direction:column; gap:12px; padding:16px 16px 90px;  /* leave room above fixed footer */
+    }
 
     /* Top bar */
     .topbar{display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap}
@@ -46,9 +50,15 @@
     .switch input{display:none}
     .knob{position:absolute; top:2px; left:2px; width:32px; height:32px; border-radius:50%; background:#888; transition:all .18s ease}
     .switch input:checked + .knob{left:30px; background:var(--accent)}
-    .btn{appearance:none; border:1px solid var(--border); background:rgba(0,0,0,.35); color:var(--fg);
-      padding:14px 18px; border-radius:14px; font-weight:800; cursor:pointer; touch-action:manipulation}
+    .btn{
+      appearance:none; border:1px solid var(--border); background:rgba(0,0,0,.35); color:var(--fg);
+      padding:14px 18px; border-radius:14px; font-weight:800; cursor:pointer; touch-action:manipulation
+    }
     .btn:active{transform:translateY(1px)}
+    .btn.active{
+      background:rgba(96,165,250,.25);
+      box-shadow:0 0 0 2px rgba(96,165,250,.45) inset;
+    }
     input[type="range"]{accent-color:var(--accent)}
 
     /* Screens */
@@ -56,9 +66,7 @@
     .screen.active{display:block}
 
     /* TIMER (transparent, no background box) */
-    .timer{
-      text-align:center; padding:16px 8px;
-    }
+    .timer{text-align:center; padding:16px 8px}
     .phase{font-weight:900; letter-spacing:.08em; text-transform:uppercase; margin-top:8px}
     .rep{font-size:120px; font-weight:900; line-height:1; margin:4px 0 6px; opacity:.25}
     .clock{font-size:112px; font-weight:900; line-height:1; margin:6px 0}
@@ -68,14 +76,14 @@
     .pill{background:rgba(0,0,0,.35); border:1px solid var(--border); padding:12px 16px; border-radius:999px; color:var(--fg); font-weight:700}
 
     .cta{display:flex; gap:12px; justify-content:center; align-items:center; flex-wrap:wrap; margin-top:12px}
-    .btn-xxl{font-size:26px; padding:18px 26px; border-radius:20px; min-width:160px}
+    .btn-xxl{font-size:26px; padding:18px 26px; border-radius:20px; min-width:170px}
 
     /* SETTINGS */
     .settings{background:rgba(0,0,0,.35); border:1px solid var(--border); border-radius:16px; padding:16px}
     h2{margin:6px 0 12px; font-size:18px; text-transform:uppercase; letter-spacing:.08em}
     .block{background:rgba(0,0,0,.25); border:1px solid var(--border); border-radius:14px; padding:14px; margin-bottom:12px}
 
-    /* 4 digits per row on mobile */
+    /* 4 digits per row on mobile, room for Save button below */
     .digit-grid{
       display:grid; grid-template-columns:repeat(4, minmax(52px,1fr)); gap:10px; max-width:440px; margin:0 auto;
     }
@@ -97,19 +105,19 @@
       .rep{font-size:96px}
       .digit{width:52px; height:70px; font-size:30px}
       .ud button{width:52px}
-      .btn-xxl{min-width:140px}
+      .btn-xxl{min-width:150px}
     }
 
     /* FOOTER fixed */
     .footer{
       position:fixed; bottom:0; left:0; right:0;
-      text-align:center; font-size:12px; opacity:.7;
+      text-align:center; font-size:12px; opacity:.8;
       padding:8px 6px; background:rgba(0,0,0,.35); z-index:5;
     }
   </style>
 </head>
 <body>
-  <!-- BARGRAPH BACKGROUND -->
+  <!-- BARGRAPH BACKGROUND (grows upward over time) -->
   <div class="progress-full" id="progressFull"></div>
 
   <div class="app">
@@ -145,8 +153,8 @@
           <span class="pill">Rest: <b><span id="restMM">00</span>:<span id="restSS">10</span></b></span>
         </div>
         <div class="cta">
-          <button id="startBtn" class="btn btn-xxl">▶️ Start / Cont</button>
-          <button id="pauseBtn" class="btn btn-xxl">⏸️ Pause</button>
+          <button id="startBtn" class="btn btn-xxl" aria-pressed="false">▶️ Start / Cont</button>
+          <button id="pauseBtn" class="btn btn-xxl" aria-pressed="false">⏸️ Pause</button>
           <button id="resetBtn" class="btn btn-xxl">⏹ Reset</button>
         </div>
       </div>
@@ -225,7 +233,7 @@
   </div>
 
   <!-- FIXED FOOTER -->
-  <div class="footer">Jimmy James - 16.08.2025 - 10:55</div>
+  <div class="footer">Jimmy James - 16.08.2025 - 11:45 - v.01.03</div>
 
   <script>
     // ---------- Utilities ----------
@@ -251,7 +259,7 @@
     // ---------- Persistence ----------
     (function load(){
       try{
-        const saved = JSON.parse(localStorage.getItem('tabata_v7')||'{}');
+        const saved = JSON.parse(localStorage.getItem('tabata_v8')||'{}');
         if(Number.isFinite(saved.work)) state.work = saved.work;
         if(Number.isFinite(saved.rest)) state.rest = saved.rest;
         if(typeof saved.muted==='boolean') state.muted = saved.muted;
@@ -259,7 +267,7 @@
       }catch{}
     })();
     function save(){
-      localStorage.setItem('tabata_v7', JSON.stringify({
+      localStorage.setItem('tabata_v8', JSON.stringify({
         work:state.work, rest:state.rest, muted:state.muted, volume:state.volume
       }));
     }
@@ -274,6 +282,9 @@
     const workMM=el('workMM'), workSS=el('workSS'), restMM=el('restMM'), restSS=el('restSS');
     const soundToggle = el('soundToggle');
     const volumeInput = el('volume');
+    const startBtn = el('startBtn');
+    const pauseBtn = el('pauseBtn');
+    const resetBtn = el('resetBtn');
 
     // ---------- Topbar ----------
     soundToggle.checked = !state.muted;
@@ -286,9 +297,9 @@
     el('backToTimer').addEventListener('click', ()=> showScreen('timer'));
     el('saveSettings').addEventListener('click', ()=>{
       const w = readDigits('work'); const r = readDigits('rest');
-      state.work = w; state.rest = r; save(); updateLabels(); showScreen('timer'); updateClockDisplay();
+      state.work = w; state.rest = r; save(); updateLabels(); showScreen('timer'); resetPhaseOnly();
     });
-    el('settingsReset').addEventListener('click', ()=>{ reset(); showScreen('timer'); });
+    el('settingsReset').addEventListener('click', ()=>{ fullReset(); showScreen('timer'); });
 
     function showScreen(which){
       if(which==='settings'){ settingsScreen.classList.add('active'); timerScreen.classList.remove('active'); }
@@ -308,28 +319,36 @@
       restMM.textContent = pad(rp.m); restSS.textContent = pad(rp.s);
     }
 
-    // progress bar: start full at top, then height decreases (descends)
+    // progress bar: starts small at bottom, grows upward; at end it covers the whole screen
     function updateClockDisplay(){
       const total = state.phase==='work' ? state.work : state.rest;
       const remain = Math.max(0, total - Math.floor(state.elapsed));
       const p = secsToParts(remain);
       clockEl.textContent = `${pad(p.m)}:${pad(p.s)}`;
 
+      // fraction elapsed
       const frac = total>0 ? clamp(state.elapsed/total, 0, 1) : 1;
-      progressFull.style.height = ((1-frac)*100).toFixed(3) + 'vh';
+      const minVH = 6; // small at the start so you see black background
+      progressFull.style.height = (Math.max(minVH, frac*100)).toFixed(2) + 'vh';
 
       // GREEN for WORK, RED for REST
       if(state.phase==='work'){
-        progressFull.style.background = 'linear-gradient(to bottom, var(--work1), var(--work2))';
-        progressFull.style.boxShadow = '0 10px 30px rgba(34,197,94,.45)';
+        progressFull.style.background = 'linear-gradient(to top, var(--work1), var(--work2))';
+        progressFull.style.boxShadow = '0 -10px 30px rgba(34,197,94,.35)';
         phaseEl.textContent = 'Work';
       } else {
-        progressFull.style.background = 'linear-gradient(to bottom, var(--rest1), var(--rest2))';
-        progressFull.style.boxShadow = '0 10px 30px rgba(239,68,68,.45)';
+        progressFull.style.background = 'linear-gradient(to top, var(--rest1), var(--rest2))';
+        progressFull.style.boxShadow = '0 -10px 30px rgba(239,68,68,.35)';
         phaseEl.textContent = 'Rest';
       }
 
       repEl.textContent = state.rep;
+
+      // button active highlights
+      startBtn.classList.toggle('active', state.running);
+      startBtn.setAttribute('aria-pressed', String(state.running));
+      pauseBtn.classList.toggle('active', !state.running && (state.elapsed>0));
+      pauseBtn.setAttribute('aria-pressed', String(!state.running && (state.elapsed>0)));
     }
 
     updateLabels(); updateClockDisplay();
@@ -377,15 +396,29 @@
 
     // ---------- Timer engine ----------
     let rafId=null;
+
     function start(){
       if(state.running) return;
       state.running=true; state.startTs = performance.now() - state.elapsed*1000;
       runPhaseTone();
       loop();
-      el('startBtn').textContent = '▶️ Start / Cont';
+      updateClockDisplay();
     }
-    function pause(){ state.running=false; if(rafId) cancelAnimationFrame(rafId); rafId=null; }
-    function reset(){ pause(); state.elapsed=0; state.phase='work'; state.rep=1; updateClockDisplay(); el('startBtn').textContent='▶️ Start / Cont'; }
+    function pause(){ state.running=false; if(rafId) cancelAnimationFrame(rafId); rafId=null; updateClockDisplay(); }
+
+    // Reset to start of CURRENT phase & rep
+    function resetPhaseOnly(){
+      pause();
+      state.elapsed=0;
+      updateClockDisplay();
+    }
+
+    // FULL reset: rep=1, phase='work'
+    function fullReset(){
+      pause();
+      state.elapsed=0; state.phase='work'; state.rep=1;
+      updateClockDisplay();
+    }
 
     function switchPhase(){
       if(state.phase==='work'){ state.phase='rest'; }
@@ -406,9 +439,20 @@
     }
 
     // Buttons
-    el('startBtn').addEventListener('click', ()=>{ ensureAudio(); start(); });
-    el('pauseBtn').addEventListener('click', ()=>{ pause(); });
-    el('resetBtn').addEventListener('click', ()=>{ reset(); });
+    startBtn.addEventListener('click', ()=>{ ensureAudio(); start(); });
+    pauseBtn.addEventListener('click', ()=>{ pause(); });
+
+    // Reset button: single tap = reset current phase; double tap = full reset (rep 1, work)
+    let lastResetTap=0;
+    resetBtn.addEventListener('click', ()=>{
+      const now = Date.now();
+      if(now - lastResetTap < 350){ // double tap
+        fullReset();
+      } else {
+        resetPhaseOnly();
+      }
+      lastResetTap = now;
+    });
 
     // ---------- Audio ----------
     // Half-octave up = base * sqrt(2)
@@ -429,7 +473,7 @@
       osc.type='sine';
       osc.frequency.value=freq;
       gain.gain.setValueAtTime(0, now);
-      gain.gain.linearRampToValueAtTime(state.volume*0.7, now+0.01);
+      gain.gain.linearRampToValueAtTime(state.volume*0.75, now+0.015);
       gain.gain.exponentialRampToValueAtTime(0.0001, now+dur);
       osc.connect(gain).connect(ctx.destination);
       osc.start(now);
@@ -461,6 +505,8 @@
       if(state.phase==='work') workTone(); else restTone();
     }
   </script>
+
+  <!-- Fixed footer -->
+  <div class="footer">Jimmy James - 16.08.2025 - 11:45 - v.01.03</div>
 </body>
 </html>
-
