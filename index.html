@@ -82,12 +82,12 @@
     .phase{font-weight:900; letter-spacing:.08em; text-transform:uppercase; margin-top:8px}
     .rep{font-size:120px; font-weight:900; line-height:1; margin:4px 0 6px; opacity:.25}
     .clock{font-size:112px; font-weight:900; line-height:1; margin:6px 0}
-    .goal{font-size:18px; opacity:.9; margin-top:6px}   /* <-- Goal time display */
+    .goal{font-size:18px; opacity:.9; margin-top:6px}   /* Goal time display */
     .pillbar{display:flex; gap:12px; justify-content:center; flex-wrap:wrap; margin:8px 0 6px}
     .pill{background:rgba(0,0,0,.35); border:1px solid var(--border); padding:12px 16px; border-radius:999px; color:var(--fg); font-weight:700}
     .cta{display:flex; flex-direction:column; gap:10px; align-items:center; justify-content:center; margin-top:12px}
     .row{display:flex; gap:12px; justify-content:center; flex-wrap:wrap}
-    .btn-xxl{font-size:26px; padding:18px 26px; border-radius:20px; min-width:170px}
+    .btn-xxl{font-size:26px; padding:18px 26px; border-radius:20px; min-width:190px}
     .hint{font-size:13px; opacity:.9}
 
     /* SETTINGS — one screen; auto-saves; Back + Reset only; compact */
@@ -125,7 +125,7 @@
     @media (max-width:400px){
       .clock{font-size:92px}
       .rep{font-size:96px}
-      .btn-xxl{min-width:150px}
+      .btn-xxl{min-width:170px}
       .digit{width:42px; height:54px; font-size:24px}
       .ud button{width:42px; padding:8px 0; font-size:16px}
       .digit-grid{max-width:330px}
@@ -167,7 +167,7 @@
 
     <!-- TIMER SCREEN -->
     <section id="timerScreen" class="screen active">
-      <div class="timer">
+      <div class="timer" id="timerArea">
         <div class="phase" id="phase">Work</div>
         <div class="rep" id="rep">1</div>
         <div class="clock" id="clock">00:00</div>
@@ -178,12 +178,11 @@
         </div>
         <div class="cta">
           <div class="row">
-            <button id="startBtn" class="btn btn-xxl" aria-pressed="false">▶️ Start / Cont</button>
-            <button id="pauseBtn" class="btn btn-xxl" aria-pressed="false">⏸️ Pause</button>
+            <button id="startBtn" class="btn btn-xxl" aria-pressed="false">▶️ Start / Pause</button>
             <button id="resetBtn" class="btn btn-xxl">⏹ Reset</button>
           </div>
           <div class="row">
-            <div class="hint">Pause stops the clock (background turns sky blue)</div>
+            <div class="hint">Mobile: tap anywhere on screen to Start/Pause. PC: press any key (incl. Return).</div>
           </div>
           <div class="row">
             <div class="hint">Reset: 1 tap → next phase · 2 taps → restart this phase</div>
@@ -291,19 +290,20 @@
     // ---------- Persistence ----------
     (function load(){
       try{
-        const saved = JSON.parse(localStorage.getItem('tabata_v14')||'{}');
+        const saved = JSON.parse(localStorage.getItem('tabata_v15')||'{}');
         if(Number.isFinite(saved.work)) state.work = saved.work;
         if(Number.isFinite(saved.rest)) state.rest = saved.rest;
         if(typeof saved.muted==='boolean') state.muted = saved.muted;
         if(Number.isFinite(saved.volume)) state.volume = saved.volume;
       }catch{}
     })();
-    function persist(){ localStorage.setItem('tabata_v14', JSON.stringify({
+    function persist(){ localStorage.setItem('tabata_v15', JSON.stringify({
       work:state.work, rest:state.rest, muted:state.muted, volume:state.volume
     })); }
 
     // ---------- Elements ----------
     const timerScreen = el('timerScreen');
+    const timerArea = el('timerArea');
     const settingsScreen = el('settingsScreen');
     const phaseEl = el('phase');
     const clockEl = el('clock');
@@ -314,7 +314,6 @@
     const soundToggle = el('soundToggle');
     const volumeInput = el('volume');
     const startBtn = el('startBtn');
-    const pauseBtn = el('pauseBtn');
     const resetBtn = el('resetBtn');
 
     // ---------- Topbar ----------
@@ -379,7 +378,7 @@
       updateGoalLabel();
 
       // fraction elapsed -> bar height (rises)
-      const frac = total>0 ? clamp(state.elapsed/total, 0, 1) : 1;
+      const frac = total>0 ? Math.min(state.elapsed/total, 1) : 1;
       const minVH = 6; // small at start so bg shows
       progressFull.style.height = (Math.max(minVH, frac*100)).toFixed(2) + 'vh';
 
@@ -406,11 +405,9 @@
 
       repEl.textContent = state.rep;
 
-      // button active highlights
+      // button active highlight
       startBtn.classList.toggle('active', state.running);
       startBtn.setAttribute('aria-pressed', String(state.running));
-      pauseBtn.classList.toggle('active', paused);
-      pauseBtn.setAttribute('aria-pressed', String(paused));
     }
 
     updateLabels(); updateClockDisplay(); updateStartEnabled();
@@ -467,16 +464,29 @@
     // ---------- Timer engine (COUNTS UP) ----------
     let rafId=null;
 
+    function ensureAudio(){
+      if(!audioCtx){ audioCtx = new (window.AudioContext||window.webkitAudioContext)(); }
+      if(audioCtx.state==='suspended'){ audioCtx.resume(); }
+    }
     function start(){
       // Don't start if both work and rest are 0
       if(!(state.work>0 || state.rest>0)) return;
       if(state.running) return;
+      ensureAudio();
       state.running=true; state.startTs = performance.now() - state.elapsed*1000;
       runPhaseTone();
       loop();
       updateClockDisplay();
     }
-    function pause(){ state.running=false; if(rafId) cancelAnimationFrame(rafId); rafId=null; updateClockDisplay(); }
+    function pause(){
+      state.running=false;
+      if(rafId) cancelAnimationFrame(rafId);
+      rafId=null;
+      updateClockDisplay();
+    }
+    function toggleStartPause(){
+      if(state.running) pause(); else start();
+    }
 
     // Restart current phase at current rep (elapsed -> 0)
     function resetPhaseOnly(){
@@ -520,14 +530,14 @@
     }
 
     // Buttons
-    startBtn.addEventListener('click', ()=>{ ensureAudio(); start(); });
-    pauseBtn.addEventListener('click', ()=>{ pause(); });
+    startBtn.addEventListener('click', (e)=>{ e.stopPropagation(); toggleStartPause(); });
 
     // Reset button gestures:
     // - Single tap -> next phase
     // - Double tap (<=350ms) -> restart current phase
     let lastTapTime = 0;
-    resetBtn.addEventListener('click', ()=>{
+    resetBtn.addEventListener('click', (e)=>{
+      e.stopPropagation();
       const now = Date.now();
       if(now - lastTapTime < 350){
         // double tap -> restart current phase
@@ -540,18 +550,30 @@
       }
     });
 
+    // ---------- Global Toggles ----------
+    // Mobile: tap anywhere on timer screen (outside interactive controls) to toggle
+    timerScreen.addEventListener('pointerdown', (e)=>{
+      const interactive = e.target.closest('button, input, label, .digit, .ud button, .settings, .chip');
+      if(interactive) return;  // don't toggle when tapping controls
+      toggleStartPause();
+    });
+
+    // PC keyboard: any key toggles Start/Pause (ignore typing in inputs)
+    document.addEventListener('keydown', (e)=>{
+      const tag = (e.target && e.target.tagName) ? e.target.tagName.toUpperCase() : '';
+      if(tag==='INPUT' || tag==='TEXTAREA' || e.target.isContentEditable) return;
+      // ignore if on settings screen to avoid accidental toggles while editing with keys:
+      if(settingsScreen.classList.contains('active')) return;
+      toggleStartPause();
+    });
+
     // Settings buttons
     el('backToTimer').addEventListener('click', ()=> showScreen('timer'));
 
     // ---------- Audio ----------
     // Half-octave up = base * sqrt(2)
     const HALF_OCT = Math.SQRT2;
-
     let audioCtx=null;
-    function ensureAudio(){
-      if(!audioCtx){ audioCtx = new (window.AudioContext||window.webkitAudioContext)(); }
-      if(audioCtx.state==='suspended'){ audioCtx.resume(); }
-    }
 
     function beep(freq=440, dur=0.3, t0){
       if(state.muted || !audioCtx) return 0;
@@ -572,19 +594,17 @@
 
     // WORK start tone: 0.5s, ~622 Hz
     function workTone(){
-      ensureAudio();
       const base = 440 * HALF_OCT; // ~622 Hz
       beep(base, 0.5);
     }
 
     // REST start tones: ~1108 Hz then ~739 Hz, 0.3s each
     function restTone(){
-      ensureAudio();
-      const start = audioCtx.currentTime;
+      const start = audioCtx ? audioCtx.currentTime : 0;
       const hi = 784 * HALF_OCT;  // ~1108 Hz
       const lo = 523 * HALF_OCT;  // ~739 Hz
-      const d1 = beep(hi, 0.3, start);
-      const d2 = beep(lo, 0.3, start + d1 + 0.06);
+      const d1 = beep(hi, 0.3, start || undefined);
+      const d2 = beep(lo, 0.3, (start||0) + d1 + 0.06);
       return d1 + d2 + 0.06;
     }
 
