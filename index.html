@@ -66,6 +66,13 @@
     .btn.active{ background:rgba(96,165,250,.25); box-shadow:0 0 0 2px rgba(96,165,250,.45) inset; }
     input[type="range"]{accent-color:var(--accent)}
 
+    /* Disabled Start style when both times are 0 */
+    .btn.disabled{
+      opacity:.45; filter:grayscale(.2);
+      cursor:not-allowed;
+      box-shadow:none !important;
+    }
+
     /* Screens */
     .screen{display:none}
     .screen.active{display:block}
@@ -81,17 +88,16 @@
     .cta{display:flex; gap:12px; justify-content:center; align-items:center; flex-wrap:wrap; margin-top:12px}
     .btn-xxl{font-size:26px; padding:18px 26px; border-radius:20px; min-width:170px}
 
-    /* SETTINGS — fits in one window; auto-saves; Back + Reset only */
+    /* SETTINGS — one screen; auto-saves; Back + Reset only; compact */
     .settings{
       background:rgba(0,0,0,.35); border:1px solid var(--border); border-radius:14px;
-      padding:10px 12px; /* tighter */
+      padding:10px 12px;
     }
     h2{margin:4px 0 8px; font-size:16px; text-transform:uppercase; letter-spacing:.07em}
     .block{
       background:rgba(0,0,0,.25); border:1px solid var(--border); border-radius:12px;
-      padding:10px; margin-bottom:8px; /* tighter */
+      padding:10px; margin-bottom:8px;
     }
-    /* Smaller digits + buttons so everything fits without scroll */
     .digit-grid{
       display:grid; grid-template-columns:repeat(4, minmax(44px,1fr));
       gap:8px; max-width:360px; margin:0 auto;
@@ -109,7 +115,6 @@
     }
     .dlabel{font-size:11px; opacity:.8}
 
-    /* Keep Back + Reset visible side-by-side without scrolling */
     .settings-cta{
       display:flex; justify-content:center; gap:10px; margin-top:6px; flex-wrap:nowrap;
     }
@@ -128,7 +133,7 @@
     /* FOOTER fixed */
     .footer{
       position:fixed; bottom:0; left:0; right:0;
-      text-align:center; font-size:12px; opacity:.85;
+      text-align:center; font-size:12px; opacity:.9;
       padding:8px 6px; background:rgba(0,0,0,.35); z-index:5; line-height:1.25;
     }
   </style>
@@ -248,11 +253,8 @@
     </section>
   </div>
 
-  <!-- FIXED FOOTER (two lines) -->
-  <div class="footer">
-    Jimmy James - 16.08.2025 - 11:45 - v.01.03<br/>
-    12:36<br/>v.01.04
-  </div>
+  <!-- FIXED FOOTER -->
+  <div class="footer">Jimmy James - 16.08.2025 - 13:05 - v. 1.05</div>
 
   <script>
     // ---------- Utilities ----------
@@ -278,14 +280,14 @@
     // ---------- Persistence ----------
     (function load(){
       try{
-        const saved = JSON.parse(localStorage.getItem('tabata_v11')||'{}');
+        const saved = JSON.parse(localStorage.getItem('tabata_v12')||'{}');
         if(Number.isFinite(saved.work)) state.work = saved.work;
         if(Number.isFinite(saved.rest)) state.rest = saved.rest;
         if(typeof saved.muted==='boolean') state.muted = saved.muted;
         if(Number.isFinite(saved.volume)) state.volume = saved.volume;
       }catch{}
     })();
-    function persist(){ localStorage.setItem('tabata_v11', JSON.stringify({
+    function persist(){ localStorage.setItem('tabata_v12', JSON.stringify({
       work:state.work, rest:state.rest, muted:state.muted, volume:state.volume
     })); }
 
@@ -312,7 +314,7 @@
     // ---------- Navigation ----------
     el('openSettings').addEventListener('click', ()=> openSettings());
     el('backToTimer').addEventListener('click', ()=> showScreen('timer'));
-    // Settings reset: sets both Work and Rest to 00:00 and updates immediately
+    // Settings reset: sets both Work and Rest to 00:00, keeps in settings, and disables Start until set
     el('settingsReset').addEventListener('click', ()=>{
       pause();
       state.work = 0;
@@ -321,7 +323,7 @@
       populateDigits('work', state.work);
       populateDigits('rest', state.rest);
       updateLabels();
-      // keep user in settings; timer display will show 00:00 when you go back
+      updateStartEnabled();
     });
 
     function showScreen(which){
@@ -344,6 +346,13 @@
       restMM.textContent = pad(rp.m); restSS.textContent = pad(rp.s);
     }
 
+    function updateStartEnabled(){
+      const allow = (state.work>0 || state.rest>0);
+      startBtn.classList.toggle('disabled', !allow);
+      startBtn.disabled = !allow;
+    }
+
+    // progress bar & backgrounds
     function updateClockDisplay(){
       const total = state.phase==='work' ? state.work : state.rest;
       const remain = Math.max(0, total - Math.floor(state.elapsed));
@@ -385,7 +394,7 @@
       pauseBtn.setAttribute('aria-pressed', String(paused));
     }
 
-    updateLabels(); updateClockDisplay();
+    updateLabels(); updateClockDisplay(); updateStartEnabled();
 
     // ---------- Digit editor (AUTO-SAVE) ----------
     function populateDigits(kind, secs){
@@ -406,7 +415,7 @@
     function commitDigits(kind){
       const secs = readDigits(kind);
       if(kind==='work') state.work = secs; else state.rest = secs;
-      persist(); updateLabels();
+      persist(); updateLabels(); updateStartEnabled();
     }
 
     qsa('.digit-grid').forEach(grid=>{
@@ -440,6 +449,8 @@
     let rafId=null;
 
     function start(){
+      // Don't start if both work and rest are 0 (after settings reset)
+      if(!(state.work>0 || state.rest>0)) return;
       if(state.running) return;
       state.running=true; state.startTs = performance.now() - state.elapsed*1000;
       runPhaseTone();
@@ -587,9 +598,7 @@
   </script>
 
   <!-- Fixed footer -->
-  <div class="footer">
-    Jimmy James - 16.08.2025 - 11:45 - v.01.03<br/>
-    12:36<br/>v.01.04
-  </div>
+  <div class="footer">Jimmy James - 16.08.2025 - 13:05 - v. 1.05</div>
 </body>
 </html>
+
