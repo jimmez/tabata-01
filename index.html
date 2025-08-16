@@ -81,32 +81,48 @@
     .cta{display:flex; gap:12px; justify-content:center; align-items:center; flex-wrap:wrap; margin-top:12px}
     .btn-xxl{font-size:26px; padding:18px 26px; border-radius:20px; min-width:170px}
 
-    /* SETTINGS — single window; auto-saves; Back + Reset only */
-    .settings{background:rgba(0,0,0,.35); border:1px solid var(--border); border-radius:16px; padding:16px}
-    h2{margin:6px 0 12px; font-size:18px; text-transform:uppercase; letter-spacing:.08em}
-    .block{background:rgba(0,0,0,.25); border:1px solid var(--border); border-radius:14px; padding:14px; margin-bottom:12px}
+    /* SETTINGS — fits in one window; auto-saves; Back + Reset only */
+    .settings{
+      background:rgba(0,0,0,.35); border:1px solid var(--border); border-radius:14px;
+      padding:10px 12px; /* tighter */
+    }
+    h2{margin:4px 0 8px; font-size:16px; text-transform:uppercase; letter-spacing:.07em}
+    .block{
+      background:rgba(0,0,0,.25); border:1px solid var(--border); border-radius:12px;
+      padding:10px; margin-bottom:8px; /* tighter */
+    }
+    /* Smaller digits + buttons so everything fits without scroll */
     .digit-grid{
-      display:grid; grid-template-columns:repeat(4, minmax(52px,1fr)); gap:10px; max-width:440px; margin:0 auto;
+      display:grid; grid-template-columns:repeat(4, minmax(44px,1fr));
+      gap:8px; max-width:360px; margin:0 auto;
     }
-    .digit-box{display:flex; flex-direction:column; align-items:center; gap:8px}
+    .digit-box{display:flex; flex-direction:column; align-items:center; gap:6px}
     .digit{
-      width:58px; height:78px; border-radius:12px; border:1px solid var(--border);
+      width:46px; height:58px; border-radius:10px; border:1px solid var(--border);
       background:rgba(0,0,0,.35); display:grid; place-items:center;
-      font-size:34px; font-weight:900; color:var(--fg); cursor:pointer; user-select:none
+      font-size:26px; font-weight:900; color:var(--fg); cursor:pointer; user-select:none
     }
-    .ud{display:flex; gap:8px}
+    .ud{display:flex; gap:6px}
     .ud button{
-      width:58px; padding:12px 0; border-radius:12px; background:rgba(0,0,0,.45);
-      border:1px solid var(--border); color:var(--fg); font-weight:900; font-size:22px; touch-action:manipulation
+      width:46px; padding:8px 0; border-radius:10px; background:rgba(0,0,0,.45);
+      border:1px solid var(--border); color:var(--fg); font-weight:900; font-size:18px; touch-action:manipulation
     }
-    .dlabel{font-size:12px; opacity:.8}
+    .dlabel{font-size:11px; opacity:.8}
+
+    /* Keep Back + Reset visible side-by-side without scrolling */
+    .settings-cta{
+      display:flex; justify-content:center; gap:10px; margin-top:6px; flex-wrap:nowrap;
+    }
+    .settings-cta .btn{padding:12px 16px; font-size:18px; border-radius:12px; min-width:140px}
 
     @media (max-width:400px){
       .clock{font-size:92px}
       .rep{font-size:96px}
-      .digit{width:52px; height:70px; font-size:30px}
-      .ud button{width:52px}
       .btn-xxl{min-width:150px}
+      .digit{width:42px; height:54px; font-size:24px}
+      .ud button{width:42px; padding:8px 0; font-size:16px}
+      .digit-grid{max-width:330px}
+      .settings-cta .btn{min-width:128px}
     }
 
     /* FOOTER fixed */
@@ -161,10 +177,10 @@
       </div>
     </section>
 
-    <!-- SETTINGS SCREEN (auto-save; Back + Reset only) -->
+    <!-- SETTINGS SCREEN (auto-save; Back + Reset only; fits on one window) -->
     <section id="settingsScreen" class="screen">
       <div class="settings">
-        <h2>Work Time</h2>
+        <h2>Work</h2>
         <div class="block" id="blockWork">
           <div class="digit-grid" data-kind="work">
             <div class="digit-box" data-role="mt">
@@ -194,7 +210,7 @@
           </div>
         </div>
 
-        <h2>Rest Time</h2>
+        <h2>Rest</h2>
         <div class="block" id="blockRest">
           <div class="digit-grid" data-kind="rest">
             <div class="digit-box" data-role="mt">
@@ -224,9 +240,9 @@
           </div>
         </div>
 
-        <div class="cta" style="margin-top:8px">
-          <button class="btn btn-xxl" id="backToTimer">↩️ Back</button>
-          <button class="btn btn-xxl" id="settingsReset">⏹ Reset</button>
+        <div class="settings-cta">
+          <button class="btn" id="backToTimer">↩️ Back</button>
+          <button class="btn" id="settingsReset">⏹ Reset</button>
         </div>
       </div>
     </section>
@@ -262,14 +278,14 @@
     // ---------- Persistence ----------
     (function load(){
       try{
-        const saved = JSON.parse(localStorage.getItem('tabata_v10')||'{}');
+        const saved = JSON.parse(localStorage.getItem('tabata_v11')||'{}');
         if(Number.isFinite(saved.work)) state.work = saved.work;
         if(Number.isFinite(saved.rest)) state.rest = saved.rest;
         if(typeof saved.muted==='boolean') state.muted = saved.muted;
         if(Number.isFinite(saved.volume)) state.volume = saved.volume;
       }catch{}
     })();
-    function persist(){ localStorage.setItem('tabata_v10', JSON.stringify({
+    function persist(){ localStorage.setItem('tabata_v11', JSON.stringify({
       work:state.work, rest:state.rest, muted:state.muted, volume:state.volume
     })); }
 
@@ -296,7 +312,17 @@
     // ---------- Navigation ----------
     el('openSettings').addEventListener('click', ()=> openSettings());
     el('backToTimer').addEventListener('click', ()=> showScreen('timer'));
-    el('settingsReset').addEventListener('click', ()=>{ fullReset(); persist(); showScreen('timer'); });
+    // Settings reset: sets both Work and Rest to 00:00 and updates immediately
+    el('settingsReset').addEventListener('click', ()=>{
+      pause();
+      state.work = 0;
+      state.rest = 0;
+      persist();
+      populateDigits('work', state.work);
+      populateDigits('rest', state.rest);
+      updateLabels();
+      // keep user in settings; timer display will show 00:00 when you go back
+    });
 
     function showScreen(which){
       if(which==='settings'){ settingsScreen.classList.add('active'); timerScreen.classList.remove('active'); }
